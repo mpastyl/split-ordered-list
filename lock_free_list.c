@@ -1,6 +1,9 @@
 #include<stdio.h>
 #include<stdlib.h>
 
+//NOTES: Look ok but i i get double free sometimes , especially when i delete the head...
+
+
 /*
 struct MarkedPointer{
     unsigned long long both;
@@ -52,7 +55,7 @@ unsigned long long set_both(unsigned long long a,unsigned long long ptr, unsigne
 unsigned long long   * prev;
 unsigned long long   curr;
 unsigned long long   next;
-
+#pragma omp threadprivate(prev,curr,next)
 
 unsigned long long * Head=0;
 
@@ -109,6 +112,7 @@ int list_find(unsigned long long ** head,int key){
     try_again:
         prev=(unsigned long long *)head;
         curr=set_both(curr,get_pointer(*prev),get_count(*prev));
+        //printf("#t %d &curr= %p\n",omp_get_thread_num(),&curr);
         while (1){
 
             if(get_pointer(curr)==0) return 0;
@@ -184,22 +188,42 @@ int main(){
     */
     srand(time(NULL));
     //res=delete(Head,2);
-
-    #pragma omp parallel for num_threads(8) shared(Head) private(i,j,res)
+    int temp,k;
+    #pragma omp parallel for num_threads(8) shared(Head) private(i,j,res,temp,k)
     for(i=0;i<8;i++){
-        for(j=0;j<10;j++){
+        for(j=0;j<100;j++){
             node = (struct  NodeType *)malloc(sizeof(struct NodeType));
-            node->key=i*10+j;
+            node->key=i*100+j;
+            temp=rand()%10000;
+            for(k=0;k<temp;k++);
             res=list_insert(Head,node);
         }   
     }
 
     #pragma omp parallel for num_threads(8) shared(Head) private(i,j,res)
     for(i=0;i<8;i++){
-        for(j=0;j<10;j++){
-            res=list_delete(Head,i*10+j);
+        for(j=0;j<100;j++){
+            res=list_delete(Head,i*100+j+1);
         }
     }
+
+    
+/*    node = (struct  NodeType *)malloc(sizeof(struct NodeType));
+    node->key=0;
+    res=list_insert(Head,node);
+    int temp;
+    #pragma omp parallel for num_threads(8) shared(Head) private(i,j,res,temp)
+    for(i=0;i<8;i++){
+        for(j=0;j<100;j++){
+            node = (struct  NodeType *)malloc(sizeof(struct NodeType));
+            node->key=rand()%100;
+            res=list_insert(Head,node);
+            temp=rand()%100;
+            if (temp!=0) res=list_delete(Head,temp);
+            
+        }   
+    }
+*/
     print_list(Head);
     return 1;
 }
