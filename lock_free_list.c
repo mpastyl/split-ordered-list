@@ -1,7 +1,7 @@
 #include<stdio.h>
 #include<stdlib.h>
 
-//NOTES: Look ok but i i get double free sometimes , especially when i delete the head...
+//NOTES: Looks ok but ABA is still  there
 
 
 /*
@@ -59,13 +59,14 @@ unsigned long long   next;
 
 unsigned long long * Head=0;
 
-int list_insert(unsigned long long * head, struct NodeType * node){
+int list_insert(struct NodeType * node){
     
     int res;
     int temp=0;
     int key=node->key;
+    
     while (1){
-        if (list_find(&head,key)) return 0;
+        if (list_find(key)) return 0;
         node->marked_next = set_both(node->marked_next,get_pointer(curr),0);
         
         unsigned long long compare_value = set_both(compare_value,get_pointer(curr),0);
@@ -75,17 +76,17 @@ int list_insert(unsigned long long * head, struct NodeType * node){
         temp++;
         res =__sync_bool_compare_and_swap(prev,compare_value,new_value);
         if (res){
-            Head=head;
+            //Head=head;
             return 1;
         }
      }
 }
 
 
-int list_delete(unsigned long long * head,int key){
+int list_delete(int key){
     
     while (1){
-        if (!list_find(&head,key))  return 0;
+        if (!list_find(key))  return 0;
         unsigned long long compare_value = set_both(compare_value,get_pointer(next),0);
         unsigned long long new_value = set_both(new_value,get_pointer(next),1);
 
@@ -99,18 +100,18 @@ int list_delete(unsigned long long * head,int key){
         if(__sync_bool_compare_and_swap(prev,compare_value,new_value))
             free((struct NodeType *)get_pointer(curr));
 
-        else list_find(&head,key);
-        Head=head;//TODO: thats not very safe
+        else list_find(key);
+        //Head=head;//TODO: thats not very safe
         return 1;
 
     }
 }
 
 
-int list_find(unsigned long long ** head,int key){
+int list_find(int key){
     
     try_again:
-        prev=(unsigned long long *)head;
+        prev=(unsigned long long *)&Head;
         curr=set_both(curr,get_pointer(*prev),get_count(*prev));
         //printf("#t %d &curr= %p\n",omp_get_thread_num(),&curr);
         while (1){
@@ -136,8 +137,10 @@ int list_find(unsigned long long ** head,int key){
                 unsigned long long compare_value = set_both(compare_value,curr,0);
                 unsigned long long new_value = set_both(new_value,next,0);
 
-                if (__sync_bool_compare_and_swap(prev,compare_value,new_value))
+                if (__sync_bool_compare_and_swap(prev,compare_value,new_value)){
                     free((struct NodeType *)get_pointer(curr));
+                    //printf("Hey!\n");
+                    }
 
                 else goto try_again;
             }
@@ -188,42 +191,43 @@ int main(){
     */
     srand(time(NULL));
     //res=delete(Head,2);
-    int temp,k;
-    #pragma omp parallel for num_threads(8) shared(Head) private(i,j,res,temp,k)
+/*    int temp,k;
+    #pragma omp parallel for num_threads(8) shared(Head) private(i,j,res,temp,k,node)
     for(i=0;i<8;i++){
         for(j=0;j<100;j++){
             node = (struct  NodeType *)malloc(sizeof(struct NodeType));
             node->key=i*100+j;
             temp=rand()%10000;
             for(k=0;k<temp;k++);
-            res=list_insert(Head,node);
+            res=list_insert(node);
+            //if(res==0) printf("insert failed thread %d key %d\n",omp_get_thread_num(),node->key);
         }   
     }
 
     #pragma omp parallel for num_threads(8) shared(Head) private(i,j,res)
     for(i=0;i<8;i++){
         for(j=0;j<100;j++){
-            res=list_delete(Head,i*100+j+1);
+            res=list_delete(i*100+j);
         }
     }
-
+*/
     
-/*    node = (struct  NodeType *)malloc(sizeof(struct NodeType));
+    node = (struct  NodeType *)malloc(sizeof(struct NodeType));
     node->key=0;
-    res=list_insert(Head,node);
+    res=list_insert(node);
     int temp;
-    #pragma omp parallel for num_threads(8) shared(Head) private(i,j,res,temp)
+    #pragma omp parallel for num_threads(8) shared(Head) private(i,j,res,temp,node)
     for(i=0;i<8;i++){
         for(j=0;j<100;j++){
             node = (struct  NodeType *)malloc(sizeof(struct NodeType));
             node->key=rand()%100;
-            res=list_insert(Head,node);
+            res=list_insert(node);
             temp=rand()%100;
-            if (temp!=0) res=list_delete(Head,temp);
+            res=list_delete(temp);
             
         }   
     }
-*/
+
     print_list(Head);
     return 1;
 }
