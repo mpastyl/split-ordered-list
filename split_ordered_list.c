@@ -1,38 +1,27 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-// node of a list (bucket)
-struct node_t{
-    int value;
-    int hash_code;
-    struct node_t * next;
+
+struct NodeType{
+    unsigned int key;
+    unsigned long long marked_next;
 };
 
-
-struct HashSet{
-    //int length;
-    struct node_t ** table;
-    int capacity;
-    int setSize;
-    int * locks;
-    int locks_length;
-    unsigned long long owner;
-};
 
 unsigned long long get_count(unsigned long long a){
 
-    unsigned long long b = a >>48;
+    unsigned long long b = a >>63;
     return b;
 }
 
 unsigned long long get_pointer(unsigned long long a){
-    unsigned long long b = a << 16;
-    b= b >>16;
+    unsigned long long b = a << 1;
+    b= b >>1;
     return b;
 }
 
 unsigned long long set_count(unsigned long long  a, unsigned long long count){
-    unsigned long long count_temp =  count << 48;
+    unsigned long long count_temp =  count << 63;
     unsigned long long b = get_pointer(a);
     b = b | count_temp;
     return b;
@@ -47,17 +36,117 @@ unsigned long long set_pointer(unsigned long long a, unsigned long long ptr){
     return b;
 }
 
-unsigned long long set_both(unsigned long long a, unsigned long long ptr, unsigned long long count){
+unsigned long long set_both(unsigned long long a,unsigned long long ptr, unsigned long long count){
     a=set_pointer(a,ptr);
     a=set_count(a,count);
     return a;
 }
 
 
+//they must all be thread-private
+unsigned long long   * prev;
+unsigned long long   curr;
+unsigned long long   next;
+#pragma omp threadprivate(prev,curr,next)
+
+unsigned long long * Head=0;
+
+int list_insert(unsigned long long * head, struct NodeType * node){
+    
+    int res;
+    int temp=0;
+    int key=node->key;
+    
+    while (1){
+        if (list_find(&head,key)) return 0;
+        node->marked_next = set_both(node->marked_next,get_pointer(curr),0);
+        
+        unsigned long long compare_value = set_both(compare_value,get_pointer(curr),0);
+        unsigned long long new_value = set_both(new_value,(unsigned long long ) node,0);
+        
+        //if((*prev)!=compare_value){ if(temp==0)printf("wtf!! %lld %lld\n",*prev,compare_value);}
+        temp++;
+        res =__sync_bool_compare_and_swap(prev,compare_value,new_value);
+        if (res){
+            //Head=head;
+            return 1;
+        }
+     }
+}
+
+
+int list_delete(unsigned long long *head ,int key){
+    
+    while (1){
+        if (!list_find(&head,key))  return 0;
+        unsigned long long compare_value = set_both(compare_value,get_pointer(next),0);
+        unsigned long long new_value = set_both(new_value,get_pointer(next),1);
+
+        if(!__sync_bool_compare_and_swap(&(((struct NodeType *)get_pointer(curr))->marked_next),compare_value,new_value)) 
+            continue;
+
+
+        compare_value = set_both(compare_value,get_pointer(curr),0);
+        new_value = set_both(new_value,get_pointer(next),0);
+
+        if(__sync_bool_compare_and_swap(prev,compare_value,new_value))
+            free((struct NodeType *)get_pointer(curr));
+
+        else list_find(&head,key);
+        //Head=head;//TODO: thats not very safe
+        return 1;
+
+    }
+}
+
+
+int list_find(unsigned long long ** head,int key){
+    
+    try_again:
+        prev=(unsigned long long *)*head;
+        curr=set_both(curr,get_pointer(*prev),get_count(*prev));
+        //printf("#t %d &curr= %p\n",omp_get_thread_num(),&curr);
+        while (1){
+
+            if(get_pointer(curr)==0) return 0;
+            
+            unsigned long long pointer=get_pointer(((struct NodeType * )get_pointer(curr))->marked_next);
+            unsigned long long mark_bit = get_count(((struct NodeType * )get_pointer(curr))->marked_next);
+            
+            next = set_both(next,pointer,mark_bit);       
+            int ckey= ((struct NodeType *)get_pointer(curr))->key;
+            unsigned long long check=set_both(check,curr,0);
+            if ((*prev) !=check) goto  try_again;
+
+            if (get_count(next)==0){
+                if (ckey>=key)
+                    return (ckey==key);
+                prev = &(((struct NodeType *)get_pointer(curr))->marked_next);   
+            }
+
+            else{
+                
+                unsigned long long compare_value = set_both(compare_value,curr,0);
+                unsigned long long new_value = set_both(new_value,next,0);
+
+                if (__sync_bool_compare_and_swap(prev,compare_value,new_value)){
+                    free((struct NodeType *)get_pointer(curr));
+                    //printf("Hey!\n");
+                    }
+
+                else goto try_again;
+            }
+
+            curr=set_both(curr,next,get_count(next));
+       }
+       
+}              
 
 
 
 
+
+//reverse the bits of a 32-bit unsigned int
 unsigned reverse32bits(unsigned x) {
    static unsigned char table[256] = {
    0x00, 0x80, 0x40, 0xC0, 0x20, 0xA0, 0x60, 0xE0, 0x10, 0x90, 0x50, 0xD0, 0x30, 0xB0, 0x70, 0xF0,
@@ -87,7 +176,22 @@ unsigned reverse32bits(unsigned x) {
    return r;
 }
 
+void print_list(unsigned long long * head){
+        
+        struct NodeType * curr=(struct NodeType *)get_pointer((unsigned long long)*head);
+        while (curr){
+            unsigned int normal_key = curr->key/2;
+            normal_key = normal_key*2;
+            
+            normal_key = reverse32bits(normal_key);
+            
+            printf("%d \n",normal_key);
+            curr=(struct NodeType *)get_pointer(curr->marked_next);
+        }
+}
 
+
+//produce keys according to split ordering
 unsigned int so_regularkey(unsigned int key){
     return reverse32bits(key|0x80000000);
 }
@@ -96,26 +200,104 @@ unsigned int so_dummykey(unsigned int key){
     return reverse32bits(key);
 }
 
+//get the parent of a bucket by just unseting the MSB
+int get_parent(int bucket){
+     int msb = 1<< ((sizeof(int)*8)-__builtin_clz(bucket)-1);
+     int result = bucket & ~msb;
+     return result;
+}    
 
+int count;
+int size;
+
+int MAX_LOAD = 4;
+//remember to set all this as shared
 unsigned long long * T;
+
+void initialize_bucket(int bucket){
+    
+    int parent = get_parent(bucket);
+
+    if (T[parent]==0) initialize_bucket(parent);
+    
+    struct NodeType * dummy = (struct  NodeType *)malloc(sizeof(struct NodeType));
+    dummy->key=so_dummykey(bucket);
+    if(!list_insert(&(T[bucket]),dummy)){
+        free(dummy);
+        dummy=(struct Node_type *)get_pointer(curr);
+    }
+    T[bucket]=(unsigned long long )dummy;
+}
+
 
 int insert(unsigned int key){
     
     struct NodeType * node=(struct NodeType *)malloc(sizeof(struct NodeType));
     node->key = so_regularkey(key);
-    bucket = key % size;
+    int bucket = key % size;
 
     if(T[bucket]==0) initialize_bucket(bucket);
     
-    if(!list_insert
+    if(!list_insert(&(T[bucket]),node)){
+        free(node);
+        return 0;
+    }
 
+    int csize=size;
+    if ((__sync_fetch_and_add(&count,1)/csize) >MAX_LOAD){
+        int res= __sync_bool_compare_and_swap(&size,csize,2*csize);
+    }
+    return 1;
+}
+
+
+int find(unsigned int key){
+    
+    int bucket = key %size;
+    if (T[bucket]==0) initialize_bucket(bucket);
+
+    unsigned long long * temp=&T[bucket];
+    return list_find(&temp,so_regularkey(key));
+        
+}
 
 
 void main(int argc,char * argv[]){
     
     
-    printf("regular %u\n",so_regularkey(8));
+    /*printf("regular %u\n",so_regularkey(8));
     printf("dummy   %u\n",so_dummykey(3));
+    
+    printf("%d\n",get_parent(2));
+    printf("%d\n",get_parent(3));
+    printf("%d\n",get_parent(4));
+    printf("%d\n",get_parent(505));
+*/
+    //all buckets are initialized except the first bucket that points to a node with key 0
+    T = (unsigned long long *) malloc(sizeof(unsigned long long)*512);
+    unsigned long long head=0;
+    size=4;
+    
+    int res;
+    struct NodeType * node= (struct NodeType *) malloc(sizeof(struct NodeType));
+    node->key=0;
+    res=list_insert(&head,node);
+    T[0]=head;
+    res=insert(9);
+    res=insert(13);
+    res=insert(8);
+    res=insert(7);
+    res=insert(10);
+    print_list(&T[0]);
+    printf("-------\n");
+    print_list(&T[1]);
+    printf("-------\n");
+    print_list(&T[2]);
+    printf("-------\n");
+    print_list(&T[3]);
 
+    res=find(1);
+    if (res==1)printf("found\n");
+    else printf("not found\n");
 
 }
