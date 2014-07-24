@@ -19,7 +19,6 @@ struct HashSet{
     unsigned long long owner;
 };
 
-int NULL_VALUE = 5139239;
 unsigned long long get_count(unsigned long long a){
 
     unsigned long long b = a >>48;
@@ -55,291 +54,68 @@ unsigned long long set_both(unsigned long long a, unsigned long long ptr, unsign
 }
 
 
-void lock_set (int * locks, int hash_code){
 
-    int indx=hash_code;
-    //int indx=hash_code % H->locks_length;
-    while (1){
-        if (!locks[indx]){
-            if(!__sync_lock_test_and_set(&(locks[indx]),1)) break;
-        }
-    }
 
- 
-}
 
-void unlock_set(int *,int);
 
-// operations call acquire to lock
-void acquire(struct HashSet *H,int hash_code){
-    int me = omp_get_thread_num();
-    int who,cpy_owner,mark;
-    while (1){
-        cpy_owner=H->owner;
-        who=get_pointer(cpy_owner);
-        mark=get_count(cpy_owner);
-        while((mark==1)&&(who!=me)){
-            cpy_owner=H->owner;
-            who=get_pointer(cpy_owner);
-            mark=get_count(cpy_owner);
-        }
-        int * old_locks=H->locks;
-        int old_locks_length=H->locks_length;
-        lock_set(old_locks,hash_code % old_locks_length);
-        cpy_owner=H->owner;
-        who=get_pointer(cpy_owner);
-        mark=get_count(cpy_owner);
-        
-        if(((!mark) || (who==me))&&(H->locks==old_locks)){
-            return;
-        }
-        else{
-            unlock_set(old_locks,hash_code % old_locks_length);
-        }
-    }
+unsigned reverse32bits(unsigned x) {
+   static unsigned char table[256] = {
+   0x00, 0x80, 0x40, 0xC0, 0x20, 0xA0, 0x60, 0xE0, 0x10, 0x90, 0x50, 0xD0, 0x30, 0xB0, 0x70, 0xF0,
+   0x08, 0x88, 0x48, 0xC8, 0x28, 0xA8, 0x68, 0xE8, 0x18, 0x98, 0x58, 0xD8, 0x38, 0xB8, 0x78, 0xF8,
+   0x04, 0x84, 0x44, 0xC4, 0x24, 0xA4, 0x64, 0xE4, 0x14, 0x94, 0x54, 0xD4, 0x34, 0xB4, 0x74, 0xF4,
+   0x0C, 0x8C, 0x4C, 0xCC, 0x2C, 0xAC, 0x6C, 0xEC, 0x1C, 0x9C, 0x5C, 0xDC, 0x3C, 0xBC, 0x7C, 0xFC,
+   0x02, 0x82, 0x42, 0xC2, 0x22, 0xA2, 0x62, 0xE2, 0x12, 0x92, 0x52, 0xD2, 0x32, 0xB2, 0x72, 0xF2,
+   0x0A, 0x8A, 0x4A, 0xCA, 0x2A, 0xAA, 0x6A, 0xEA, 0x1A, 0x9A, 0x5A, 0xDA, 0x3A, 0xBA, 0x7A, 0xFA,
+   0x06, 0x86, 0x46, 0xC6, 0x26, 0xA6, 0x66, 0xE6, 0x16, 0x96, 0x56, 0xD6, 0x36, 0xB6, 0x76, 0xF6,
+   0x0E, 0x8E, 0x4E, 0xCE, 0x2E, 0xAE, 0x6E, 0xEE, 0x1E, 0x9E, 0x5E, 0xDE, 0x3E, 0xBE, 0x7E, 0xFE,
+   0x01, 0x81, 0x41, 0xC1, 0x21, 0xA1, 0x61, 0xE1, 0x11, 0x91, 0x51, 0xD1, 0x31, 0xB1, 0x71, 0xF1,
+   0x09, 0x89, 0x49, 0xC9, 0x29, 0xA9, 0x69, 0xE9, 0x19, 0x99, 0x59, 0xD9, 0x39, 0xB9, 0x79, 0xF9,
+   0x05, 0x85, 0x45, 0xC5, 0x25, 0xA5, 0x65, 0xE5, 0x15, 0x95, 0x55, 0xD5, 0x35, 0xB5, 0x75, 0xF5,
+   0x0D, 0x8D, 0x4D, 0xCD, 0x2D, 0xAD, 0x6D, 0xED, 0x1D, 0x9D, 0x5D, 0xDD, 0x3D, 0xBD, 0x7D, 0xFD,
+   0x03, 0x83, 0x43, 0xC3, 0x23, 0xA3, 0x63, 0xE3, 0x13, 0x93, 0x53, 0xD3, 0x33, 0xB3, 0x73, 0xF3,
+   0x0B, 0x8B, 0x4B, 0xCB, 0x2B, 0xAB, 0x6B, 0xEB, 0x1B, 0x9B, 0x5B, 0xDB, 0x3B, 0xBB, 0x7B, 0xFB,
+   0x07, 0x87, 0x47, 0xC7, 0x27, 0xA7, 0x67, 0xE7, 0x17, 0x97, 0x57, 0xD7, 0x37, 0xB7, 0x77, 0xF7,
+   0x0F, 0x8F, 0x4F, 0xCF, 0x2F, 0xAF, 0x6F, 0xEF, 0x1F, 0x9F, 0x5F, 0xDF, 0x3F, 0xBF, 0x7F, 0xFF};
+   int i;
+   unsigned r;
 
-}
-void unlock_set(int * locks, int hash_code){
-
-    int indx=hash_code;
-    //int indx=hash_code % H->locks_length;
-    locks[indx] = 0;
-}
-
-void release(struct HashSet * H,int hash_code){
-
-    unlock_set(H->locks,hash_code % (H->locks_length));
+   r = 0;
+   for (i = 3; i >= 0; i--) {
+      r = (r << 8) + table[x & 0xFF];
+      x = x >> 8;
+   }
+   return r;
 }
 
 
+unsigned int so_regularkey(unsigned int key){
+    return reverse32bits(key|0x80000000);
+}
 
-//search value in bucket;
-int list_search(struct node_t * Head,int val){
+unsigned int so_dummykey(unsigned int key){
+    return reverse32bits(key);
+}
+
+
+unsigned long long * T;
+
+int insert(unsigned int key){
     
-    struct node_t * curr;
+    struct NodeType * node=(struct NodeType *)malloc(sizeof(struct NodeType));
+    node->key = so_regularkey(key);
+    bucket = key % size;
+
+    if(T[bucket]==0) initialize_bucket(bucket);
     
-    curr=Head;
-    while(curr){
-        if(curr->value==val) return 1;
-        curr=curr->next;
-    }
-    return 0;
-}
+    if(!list_insert
 
 
-//add value in bucket;
-//NOTE: duplicate values are allowed...
-void list_add(struct HashSet * H, int key,int val,int hash_code){
-    
-    struct node_t * curr;
-    struct node_t * next;
-    struct node_t * node=(struct node_t *)malloc(sizeof(struct node_t));
-    /*node->value=val;
-    node->next=NULL;
-    curr=H->table[key];
-    if(curr==NULL){
-        H->table[key]=node;
-        return ;
-    }
-    while(curr->next){
-        curr=curr->next;
-        next=curr->next;
-    }
-    curr->next=node;
-    */
-    node->value=val;
-    node->hash_code=hash_code;
-    if(H->table[key]==NULL) node->next=NULL;
-    else node->next=H->table[key];
-    H->table[key]=node;
-}
-
-
-// delete from bucket. The fist value equal to val will be deleted
-int list_delete(struct HashSet *H,int key,int val){
-    
-    struct node_t * curr;
-    struct node_t * next;
-    struct node_t * prev;
-
-    curr=H->table[key];
-    prev=curr;
-    if((curr!=NULL)&&(curr->value==val)) {
-        H->table[key]=curr->next;
-        free(curr);
-        return 1;
-    }
-    while(curr){
-        if( curr->value==val){
-            prev->next=curr->next;
-            free(curr);
-            return 1;
-        }
-        prev=curr;
-        curr=curr->next;
-    }
-    return 0;
-}
-
-
-
-
-
-void initialize(struct HashSet * H, int capacity){
-    
-    int i;
-    H->setSize=0;
-    H->capacity=capacity;
-    H->table = (struct node_t **)malloc(sizeof(struct node_t *)*capacity);
-    for(i=0;i<capacity;i++){
-        H->table[i]=NULL;
-    }
-    H->locks_length=capacity;
-    H->locks=(int *)malloc(sizeof(int) * capacity);
-    for(i=0;i<capacity;i++) H->locks[i]=0;
-    H->owner = set_both(H->owner,NULL_VALUE,0);
-
-}
-
-
-int policy(struct HashSet *H){
-    return ((H->setSize/H->capacity) >4);
-}
-
-void resize(struct HashSet *);
-
-int contains(struct HashSet *H,int hash_code, int val){
-    
-    acquire(H,hash_code);
-    int bucket_index = hash_code % H->capacity;
-    int res=list_search(H->table[bucket_index],val);
-    release(H,hash_code);
-    return res;
-}
-
-//reentrant ==1 means we must not lock( we are calling from resize so we have already locked the data structure)
-void add(struct HashSet *H,int hash_code, int val, int reentrant){
-    
-    if(!reentrant) acquire(H,hash_code);
-    int bucket_index = hash_code % H->capacity;
-    list_add(H,bucket_index,val,hash_code);
-    //H->setSize++;
-    __sync_fetch_and_add(&(H->setSize),1);
-    if(!reentrant) release(H,hash_code);
-    if (policy(H)) resize(H);
-}
-
-int delete(struct HashSet *H,int hash_code, int val){
-    
-    acquire(H,hash_code);
-    int bucket_index =  hash_code % H->capacity;
-    int res=list_delete(H,bucket_index,val);
-    //H->setSize--;
-    __sync_fetch_and_sub(&(H->setSize),1);
-    release(H,hash_code);
-    return res;
-}
-
-void quiesce(struct HashSet *H){
-    int i;
-    for(i=0;i<H->capacity;i++){
-        while(H->locks[i]==1); //TODO: is it a race?
-    }
-}
-
-void resize(struct HashSet *H){
-    
-    int i,mark,me;
-    struct node_t * curr;
-    int old_capacity = H->capacity;
-    int new_capacity =  old_capacity * 2;
-
-    me = omp_get_thread_num();
-    int expected_value = set_both(expected_value,NULL_VALUE,0);
-    int new_owner=set_both(new_owner,me,1);
-    if(__sync_bool_compare_and_swap(&(H->owner),expected_value,new_owner)){
-        
-    //for(i=0;i<H->locks_length;i++) lock_set(H,i);
-        if(old_capacity!=H->capacity) {
-            for(i=0;i<H->locks_length;i++) //unlock_set(H,i);
-                return; //somebody beat us to it
-        }
-        quiesce(H);  
-        H->capacity =  new_capacity;
-        H->locks_length = new_capacity; //in this implementetion 
-                                        //locks_length == capacity
-        struct node_t ** old_table = H->table;
-        H->setSize=0;
-        H->table = (struct node_t **)malloc(sizeof(struct node_t *)*new_capacity);
-        for(i=0;i<new_capacity;i++){
-            H->table[i]=NULL;
-        }
-        //re hash everything from the old table to the new one
-        for(i=0;i<old_capacity;i++){
-        
-            curr=old_table[i];
-            while(curr){
-                int val = curr->value;
-                int hash_code = curr->hash_code;
-                //int bucket_index= hash_code % new_capacity;
-                add(H,hash_code,val,1);
-                curr=curr->next;
-            }
-        }
-        free(old_table);
-        //all locks should be free now (quiesce ensures that)
-        //so we might as well delete the old ones and make new ones
-        int * old_locks = H->locks;
-        H->locks = (int *)malloc(sizeof(int) * new_capacity);
-        for(i=0;i<H->locks_length;i++) H->locks[i]=0;
-        free(old_locks);
-        expected_value = new_owner;
-        new_owner = set_both(new_owner,NULL_VALUE,0);
-        if(!__sync_bool_compare_and_swap(&(H->owner),expected_value,new_owner))
-            printf("This should not have happened\n");
-
-    }
-
-    
-
-}
-
-void print_set(struct HashSet * H){
-    
-    int i;
-    for(i=0;i<H->capacity;i++){
-        
-        struct node_t * curr=H->table[i];
-        while(curr){
-            printf("(%d) ",curr->value);
-            curr=curr->next;
-        }
-        printf("--\n");
-    }
-}
 
 void main(int argc,char * argv[]){
-
-    struct HashSet * H=(struct HashSet *) malloc(sizeof(struct HashSet));
-    initialize(H,10);
-    srand(time(NULL));
-    int i,j;
-    #pragma omp parallel for num_threads(5) shared(H) private(i,j)
-    for(j=0;j<5;j++){
-        for(i=0;i<100;i++){
-            add(H,i+j*100,i+j*100,0);
-            //add(H,rand(),i,0);
-        }
-    }
     
-    /*
-    for(i=0;i<55;i++){
-        add(H,i,i,0);
-    }
-    */
-    //print_set(H);
-    printf("%d \n",H->setSize);
-    return;
-
     
+    printf("regular %u\n",so_regularkey(8));
+    printf("dummy   %u\n",so_dummykey(3));
+
+
 }

@@ -59,14 +59,14 @@ unsigned long long   next;
 
 unsigned long long * Head=0;
 
-int list_insert(struct NodeType * node){
+int list_insert(unsigned long long * head, struct NodeType * node){
     
     int res;
     int temp=0;
     int key=node->key;
     
     while (1){
-        if (list_find(key)) return 0;
+        if (list_find(&head,key)) return 0;
         node->marked_next = set_both(node->marked_next,get_pointer(curr),0);
         
         unsigned long long compare_value = set_both(compare_value,get_pointer(curr),0);
@@ -83,10 +83,10 @@ int list_insert(struct NodeType * node){
 }
 
 
-int list_delete(int key){
+int list_delete(unsigned long long *head ,int key){
     
     while (1){
-        if (!list_find(key))  return 0;
+        if (!list_find(&head,key))  return 0;
         unsigned long long compare_value = set_both(compare_value,get_pointer(next),0);
         unsigned long long new_value = set_both(new_value,get_pointer(next),1);
 
@@ -100,7 +100,7 @@ int list_delete(int key){
         if(__sync_bool_compare_and_swap(prev,compare_value,new_value))
             free((struct NodeType *)get_pointer(curr));
 
-        else list_find(key);
+        else list_find(&head,key);
         //Head=head;//TODO: thats not very safe
         return 1;
 
@@ -108,10 +108,10 @@ int list_delete(int key){
 }
 
 
-int list_find(int key){
+int list_find(unsigned long long ** head,int key){
     
     try_again:
-        prev=(unsigned long long *)&Head;
+        prev=(unsigned long long *)*head;
         curr=set_both(curr,get_pointer(*prev),get_count(*prev));
         //printf("#t %d &curr= %p\n",omp_get_thread_num(),&curr);
         while (1){
@@ -153,7 +153,7 @@ int list_find(int key){
 
 void print_list(unsigned long long * head){
         
-        struct NodeType * curr=(struct NodeType *)get_pointer((unsigned long long)head);
+        struct NodeType * curr=(struct NodeType *)get_pointer((unsigned long long)*head);
         while (curr){
             printf("%d \n",curr->key);
             curr=(struct NodeType *)get_pointer(curr->marked_next);
@@ -162,27 +162,28 @@ void print_list(unsigned long long * head){
 
 int main(){
     
-    unsigned long long *global_head=Head;
+    unsigned long long global_head=0;
     unsigned long long a=set_both(a,3,0);
     int i,j,res;
-    
+    struct NodeType * node;
     //printf("%d\n",sizeof(unsigned long long));
     //printf("get pointer %lld get count %lld\n",get_pointer(a),get_count(a));
     //struct NodeType * dummy=(struct NodeType *)malloc(sizeof(struct NodeType));
     //dummy->key=15;
     //dummy->marked_next=0;
     //global_head=(unsigned long long *) dummy;
-    struct NodeType * node = (struct  NodeType *)malloc(sizeof(struct NodeType));
-    /*node->key=7;
-    int res= list_insert(Head,node);
+    //struct NodeType * node = (struct  NodeType *)malloc(sizeof(struct NodeType));
+    //node->key=7;
+    //int res= list_insert(Head,node);
 
-    node = (struct  NodeType *)malloc(sizeof(struct NodeType));
+/*    node = (struct  NodeType *)malloc(sizeof(struct NodeType));
     node->key=8;
-    res= list_insert(Head,node);
+    res= list_insert(&global_head,node);
     node = (struct  NodeType *)malloc(sizeof(struct NodeType));
     node->key=2;
-    res= list_insert(Head,node);
-    node = (struct  NodeType *)malloc(sizeof(struct NodeType));
+    res= list_insert(&global_head,node);
+*/
+/*node = (struct  NodeType *)malloc(sizeof(struct NodeType));
     node->key=4;
     res= list_insert(Head,node);
     node = (struct  NodeType *)malloc(sizeof(struct NodeType));
@@ -191,43 +192,45 @@ int main(){
     */
     srand(time(NULL));
     //res=delete(Head,2);
-/*    int temp,k;
+/*  int temp,k;
     #pragma omp parallel for num_threads(8) shared(Head) private(i,j,res,temp,k,node)
     for(i=0;i<8;i++){
-        for(j=0;j<100;j++){
+        for(j=0;j<10;j++){
             node = (struct  NodeType *)malloc(sizeof(struct NodeType));
-            node->key=i*100+j;
+            node->key=i*10+j;
             temp=rand()%10000;
             for(k=0;k<temp;k++);
-            res=list_insert(node);
+            res=list_insert(&global_head,node);
             //if(res==0) printf("insert failed thread %d key %d\n",omp_get_thread_num(),node->key);
         }   
     }
 
+    
+
     #pragma omp parallel for num_threads(8) shared(Head) private(i,j,res)
     for(i=0;i<8;i++){
         for(j=0;j<100;j++){
-            res=list_delete(i*100+j);
+            res=list_delete(&global_head,i*100+j);
         }
     }
 */
     
     node = (struct  NodeType *)malloc(sizeof(struct NodeType));
     node->key=0;
-    res=list_insert(node);
+    res=list_insert(&global_head,node);
     int temp;
     #pragma omp parallel for num_threads(8) shared(Head) private(i,j,res,temp,node)
     for(i=0;i<8;i++){
         for(j=0;j<100;j++){
             node = (struct  NodeType *)malloc(sizeof(struct NodeType));
             node->key=rand()%100;
-            res=list_insert(node);
+            res=list_insert(&global_head,node);
             temp=rand()%100;
-            res=list_delete(temp);
+            res=list_delete(&global_head,temp);
             
         }   
     }
 
-    print_list(Head);
+    print_list(&global_head);
     return 1;
 }
