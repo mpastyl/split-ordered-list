@@ -185,7 +185,8 @@ void print_list(unsigned long long * head){
             
             normal_key = reverse32bits(normal_key);
             
-            printf("%d \n",normal_key);
+            if (curr->key%2==1)printf("%d \n",normal_key);
+            else printf("*%d \n",normal_key);
             curr=(struct NodeType *)get_pointer(curr->marked_next);
         }
 }
@@ -210,7 +211,7 @@ int get_parent(int bucket){
 int count;
 int size;
 
-int MAX_LOAD = 1;
+int MAX_LOAD = 6;
 
 
 unsigned long long uninitialized;//pointer value that stands for invalid bucket
@@ -343,7 +344,7 @@ void main(int argc,char * argv[]){
         }
     }
 */
-    #pragma omp parallel for num_threads(8) shared(T,count,size) private(c,k)
+    #pragma omp parallel for num_threads(8) shared(T,count,size) private(c,k,j)
     for(i=0;i<8;i++){
         for(j=0;j<100;j++){
             c=rand()%1000;
@@ -367,10 +368,12 @@ void main(int argc,char * argv[]){
     print_list(&T[3]);
     */
     print_list(&T[0]);
-    printf("-------\n");
+    printf("--- size = %d\n",size);
+    printf("--- count = %d\n",count);
+    /*printf("-------\n");
     res=find(10);
     if (res==1)printf("found\n");
     else printf("not found\n");
     printf("%u\n",so_regularkey(10));
-
+    */
 }
