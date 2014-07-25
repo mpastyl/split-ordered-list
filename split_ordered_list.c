@@ -210,7 +210,7 @@ int get_parent(int bucket){
 int count;
 int size;
 
-int MAX_LOAD = 2;
+int MAX_LOAD = 1;
 
 
 unsigned long long uninitialized;//pointer value that stands for invalid bucket
@@ -248,9 +248,25 @@ int insert(unsigned int key){
     }
 
     int csize=size;
-    if ((__sync_fetch_and_add(&count,1)/csize) >MAX_LOAD){
+    int new = __sync_fetch_and_add(&count,1);
+
+    //printf("count is %d\n",new);
+    if ((new/csize) >MAX_LOAD){
+        //printf("count is %d and size is %d\n",count,size);
         int res= __sync_bool_compare_and_swap(&size,csize,2*csize);
     }
+    return 1;
+}
+
+int delete(unsigned int key){
+    
+    int bucket = key % size;
+    if (T[bucket]==uninitialized) initialize_bucket(bucket);
+
+    if(!list_delete(&(T[bucket]),so_regularkey(key)))
+        return 0;
+
+    int res=__sync_fetch_and_sub(&count,1);
     return 1;
 }
 
@@ -303,7 +319,8 @@ void main(int argc,char * argv[]){
 
 
     srand(time(NULL));
-    int c,k;
+    int c,k,j;
+/*   
     #pragma omp parallel for num_threads(4) shared(T,count,size) private(c,k)
 
     for(i=0;i<4;i++){
@@ -316,6 +333,7 @@ void main(int argc,char * argv[]){
         else if(i==2) {
             c=rand()%1000;
             for(k=0;k<c;k++);
+            res = delete(13);
             res = insert(7);
         }
         else if(i==3) {
@@ -324,6 +342,16 @@ void main(int argc,char * argv[]){
             res = insert(10);
         }
     }
+*/
+    #pragma omp parallel for num_threads(8) shared(T,count,size) private(c,k)
+    for(i=0;i<8;i++){
+        for(j=0;j<100;j++){
+            c=rand()%1000;
+            for(k=0;k<c;k++);
+            res = insert(i*100 +j);
+            if (res==0) printf("hey! %d \n",i*100+j);
+        }
+     }
     /*res=insert(9);
     res=insert(13);
     res=insert(8);
@@ -340,7 +368,7 @@ void main(int argc,char * argv[]){
     */
     print_list(&T[0]);
     printf("-------\n");
-    res=find(1);
+    res=find(10);
     if (res==1)printf("found\n");
     else printf("not found\n");
     printf("%u\n",so_regularkey(10));
