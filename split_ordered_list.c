@@ -55,7 +55,7 @@ int list_insert(unsigned long long * head, struct NodeType * node){
     
     int res;
     int temp=0;
-    int key=node->key;
+    unsigned int key=node->key;
     
     while (1){
         if (list_find(&head,key)) return 0;
@@ -75,7 +75,7 @@ int list_insert(unsigned long long * head, struct NodeType * node){
 }
 
 
-int list_delete(unsigned long long *head ,int key){
+int list_delete(unsigned long long *head ,unsigned int key){
     
     while (1){
         if (!list_find(&head,key))  return 0;
@@ -100,7 +100,7 @@ int list_delete(unsigned long long *head ,int key){
 }
 
 
-int list_find(unsigned long long ** head,int key){
+int list_find(unsigned long long ** head,unsigned int key){
     
     try_again:
         prev=(unsigned long long *)*head;
@@ -114,7 +114,7 @@ int list_find(unsigned long long ** head,int key){
             unsigned long long mark_bit = get_count(((struct NodeType * )get_pointer(curr))->marked_next);
             
             next = set_both(next,pointer,mark_bit);       
-            int ckey= ((struct NodeType *)get_pointer(curr))->key;
+            unsigned int ckey= ((struct NodeType *)get_pointer(curr))->key;
             unsigned long long check=set_both(check,curr,0);
             if ((*prev) !=check) goto  try_again;
 
@@ -210,7 +210,11 @@ int get_parent(int bucket){
 int count;
 int size;
 
-int MAX_LOAD = 4;
+int MAX_LOAD = 2;
+
+
+unsigned long long uninitialized;//pointer value that stands for invalid bucket
+
 //remember to set all this as shared
 unsigned long long * T;
 
@@ -218,11 +222,11 @@ void initialize_bucket(int bucket){
     
     int parent = get_parent(bucket);
 
-    if (T[parent]==0) initialize_bucket(parent);
+    if (T[parent]==uninitialized) initialize_bucket(parent);
     
     struct NodeType * dummy = (struct  NodeType *)malloc(sizeof(struct NodeType));
     dummy->key=so_dummykey(bucket);
-    if(!list_insert(&(T[bucket]),dummy)){
+    if(!list_insert(&(T[parent]),dummy)){
         free(dummy);
         dummy=(struct Node_type *)get_pointer(curr);
     }
@@ -236,7 +240,7 @@ int insert(unsigned int key){
     node->key = so_regularkey(key);
     int bucket = key % size;
 
-    if(T[bucket]==0) initialize_bucket(bucket);
+    if(T[bucket]==uninitialized) initialize_bucket(bucket);
     
     if(!list_insert(&(T[bucket]),node)){
         free(node);
@@ -254,7 +258,7 @@ int insert(unsigned int key){
 int find(unsigned int key){
     
     int bucket = key %size;
-    if (T[bucket]==0) initialize_bucket(bucket);
+    if (T[bucket]==uninitialized) initialize_bucket(bucket);
 
     unsigned long long * temp=&T[bucket];
     return list_find(&temp,so_regularkey(key));
@@ -274,7 +278,18 @@ void main(int argc,char * argv[]){
     printf("%d\n",get_parent(505));
 */
     //all buckets are initialized except the first bucket that points to a node with key 0
+    
+    
+    //initialization phase
+    //---------------------------------
+    unsigned int dummy_variable = 5; 
+    uninitialized =(unsigned long long) &dummy_variable;//any bucket that points to this address is considered uninitialized
+    //:TODO is the above safe?
+
+    
     T = (unsigned long long *) malloc(sizeof(unsigned long long)*512);
+    int i;
+    for(i=0;i<512;i++) T[i]= uninitialized;
     unsigned long long head=0;
     size=4;
     
@@ -283,21 +298,51 @@ void main(int argc,char * argv[]){
     node->key=0;
     res=list_insert(&head,node);
     T[0]=head;
-    res=insert(9);
+    //---------------------------------
+
+
+
+    srand(time(NULL));
+    int c,k;
+    #pragma omp parallel for num_threads(4) shared(T,count,size) private(c,k)
+
+    for(i=0;i<4;i++){
+        if(i==0) {c=rand()%1000; for(k=0;k<c;k++);res=insert(9); res=insert(8);}
+        else if(i==1) {
+            c=rand()%1000;
+            for(k=0;k<c;k++);
+            res = insert(13);
+        }
+        else if(i==2) {
+            c=rand()%1000;
+            for(k=0;k<c;k++);
+            res = insert(7);
+        }
+        else if(i==3) {
+            c=rand()%1000;
+            for(k=0;k<c;k++);
+            res = insert(10);
+        }
+    }
+    /*res=insert(9);
     res=insert(13);
     res=insert(8);
     res=insert(7);
     res=insert(10);
     print_list(&T[0]);
     printf("-------\n");
-    print_list(&T[1]);
+    */
+    /*print_list(&T[1]);
     printf("-------\n");
     print_list(&T[2]);
     printf("-------\n");
     print_list(&T[3]);
-
+    */
+    print_list(&T[0]);
+    printf("-------\n");
     res=find(1);
     if (res==1)printf("found\n");
     else printf("not found\n");
+    printf("%u\n",so_regularkey(10));
 
 }
