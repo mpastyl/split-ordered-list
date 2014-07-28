@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-
+#include "timers_lib.h"
 
 struct NodeType{
     unsigned int key;
@@ -286,16 +286,10 @@ int find(unsigned int key){
 void main(int argc,char * argv[]){
     
     
-    /*printf("regular %u\n",so_regularkey(8));
-    printf("dummy   %u\n",so_dummykey(3));
     
-    printf("%d\n",get_parent(2));
-    printf("%d\n",get_parent(3));
-    printf("%d\n",get_parent(4));
-    printf("%d\n",get_parent(505));
-*/
-    //all buckets are initialized except the first bucket that points to a node with key 0
-    
+    int num_threads=atoi(argv[1]);
+
+    printf("%d\n",num_threads);
     
     //initialization phase
     //---------------------------------
@@ -304,9 +298,9 @@ void main(int argc,char * argv[]){
     //:TODO is the above safe?
 
     
-    T = (unsigned long long *) malloc(sizeof(unsigned long long)*512);
+    T = (unsigned long long *) malloc(sizeof(unsigned long long)*4096);
     int i;
-    for(i=0;i<512;i++) T[i]= uninitialized;
+    for(i=0;i<4096;i++) T[i]= uninitialized;
     unsigned long long head=0;
     size=4;
     
@@ -344,6 +338,7 @@ void main(int argc,char * argv[]){
         }
     }
 */
+/*
     #pragma omp parallel for num_threads(8) shared(T,count,size) private(c,k,j)
     for(i=0;i<8;i++){
         for(j=0;j<100;j++){
@@ -353,6 +348,24 @@ void main(int argc,char * argv[]){
             if (res==0) printf("hey! %d \n",i*100+j);
         }
      }
+*/
+    timer_tt * timer;
+    timer = timer_init(timer);
+    timer_start(timer);
+    int * op_table;
+    #pragma omp parallel for num_threads(num_threads) shared(T,count,size) private(c,j,res,op_table)
+    for(i=0;i<num_threads;i++){
+        op_table = (int *)malloc(sizeof(int)*(1000000/num_threads));
+        for(j=0;j<(1000000/num_threads);j++) op_table[j]=rand()%10000;
+        for(j=0;j<(1000000/num_threads);j++){
+            res=insert(op_table[j]);
+        }
+    }
+    timer_stop(timer);
+    double result=timer_report_sec(timer);
+    printf(" timer result %lf \n",result);
+        
+
     /*res=insert(9);
     res=insert(13);
     res=insert(8);
@@ -367,7 +380,7 @@ void main(int argc,char * argv[]){
     printf("-------\n");
     print_list(&T[3]);
     */
-    print_list(&T[0]);
+    //print_list(&T[0]);
     printf("--- size = %d\n",size);
     printf("--- count = %d\n",count);
     /*printf("-------\n");
